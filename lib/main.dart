@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -9,6 +10,16 @@ import 'package:moc_firebase/firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  FlutterError.onError = (errorDetails) {
+    FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+  };
+
+  // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
 
   runApp(const MyApp());
 }
@@ -48,7 +59,9 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    _init();
+
+    // Callback pour appeler une fonction après le premier build du widget (après l'init)
+    WidgetsBinding.instance.addPostFrameCallback((_) => _init());
   }
 
   void _init() async {
@@ -91,10 +104,30 @@ class _MyHomePageState extends State<MyHomePage> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: () async {
+              try {
+                await Future.delayed(const Duration(seconds: 1));
+                throw Exception('coucou');
+              } catch(error) {
+                // Prévoir le crash dans le catch ET le logger sans faire crasher l'app !!
+                FirebaseCrashlytics.instance.recordError(error, StackTrace.current);
+                // FirebaseCrashlytics.instance.setUserIdentifier(identifier);
+              }
+
+            },
+            tooltip: 'Increment',
+            child: const Icon(Icons.car_crash),
+          ),
+          FloatingActionButton(
+            onPressed: _incrementCounter,
+            tooltip: 'Increment',
+            child: const Icon(Icons.add),
+          ),
+        ]
       ),
     );
   }
