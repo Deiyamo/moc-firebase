@@ -1,7 +1,9 @@
 import 'dart:ui';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_ui_firestore/firebase_ui_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:moc_firebase/analytics/analytics_provider.dart';
 import 'package:moc_firebase/analytics/firebase_analytics_handler.dart';
@@ -69,7 +71,6 @@ class _MyHomePageState extends State<MyHomePage> {
     if (mounted) {
       await AnalyticsProvider.of(context).setUserProperty('user_height', '181');
     }
-
   }
 
   void _incrementCounter() async {
@@ -84,6 +85,19 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  void _testFirestore() async {
+    final CollectionReference collectionReference = FirebaseFirestore.instance.collection('users');
+
+    try {
+      final DocumentReference documentReference = await collectionReference.add({'name': 'Lana', 'age': 29});
+      debugPrint('Document added with id: ${documentReference.id}');
+    } catch (error) {
+      debugPrint('Error writting in firestore $error');
+    }
+  }
+
+  final collectionQuery = FirebaseFirestore.instance.collection('users').orderBy('name');
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -91,17 +105,13 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+        child: FirestoreListView<Map<String, dynamic>>(
+          query: collectionQuery,
+          itemBuilder: (context, snapshot) {
+            Map<String, dynamic> user = snapshot.data();
+
+            return Text('User name is ${user['name']}');
+          },
         ),
       ),
       floatingActionButton: Column(
@@ -112,12 +122,11 @@ class _MyHomePageState extends State<MyHomePage> {
               try {
                 await Future.delayed(const Duration(seconds: 1));
                 throw Exception('coucou');
-              } catch(error) {
+              } catch (error) {
                 // Prévoir le crash dans le catch ET le logger sans faire crasher l'app !!
                 FirebaseCrashlytics.instance.recordError(error, StackTrace.current);
                 // FirebaseCrashlytics.instance.setUserIdentifier(identifier);
               }
-
             },
             tooltip: 'Increment',
             child: const Icon(Icons.car_crash),
@@ -127,7 +136,12 @@ class _MyHomePageState extends State<MyHomePage> {
             tooltip: 'Increment',
             child: const Icon(Icons.add),
           ),
-        ]
+          FloatingActionButton(
+            onPressed: _testFirestore,
+            tooltip: 'FireStore',
+            child: const Icon(Icons.local_fire_department),
+          ),
+        ],
       ),
     );
   }
